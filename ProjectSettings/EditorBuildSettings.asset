@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1045 &1
+EditorBuildSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Scenes:
+  - enabled: 0
+    path: Assets/Scenes/Escena/LoginScene.unity
+    guid: 2d421b13353413b4f800b8c2456d360b
+  - enabled: 0
+    path: Assets/Scenes/Escena/TemplosScene.unity
+    guid: 40f0d01d4a2ded84483a65ac22bc5af4
+  - enabled: 1
+    path: Assets/Scenes/Escena/Mohan_Puzzle.unity
+    guid: d3f50ad49ba767248afba62dc409afcd
+  m_configObjects:
+    com.unity.input.settings.actions: {fileID: -944628639613478452, guid: e3373105610d70545b9c11bcbb36c27e, type: 3}
+    com.unity.xr.management.loader_settings: {fileID: 11400000, guid: b7ce258feb35e4a2b9166e22a67bb026, type: 2}
