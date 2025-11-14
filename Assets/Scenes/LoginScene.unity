@@ -451,7 +451,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: -166}
+  m_AnchoredPosition: {x: 0, y: -158}
   m_SizeDelta: {x: 160, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1001 &617433534
@@ -1643,7 +1643,6 @@ GameObject:
   m_Component:
   - component: {fileID: 2013604209}
   - component: {fileID: 2013604208}
-  - component: {fileID: 2013604207}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -1651,84 +1650,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &2013604207
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2013604206}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: af4ff01f69e92cc42a1624e0561b0cd8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  estadoActual: 1
-  velocidad: 4
-  cabeza: {fileID: 656095392}
-  movimiento:
-    m_Name: Movimiento
-    m_Type: 0
-    m_ExpectedControlType: 
-    m_Id: 86b1ee76-8a30-4dee-9406-c7e846acaa96
-    m_Processors: 
-    m_Interactions: 
-    m_SingletonActionBindings:
-    - m_Name: 2D Vector
-      m_Id: 86a1e0e5-8688-4d58-9066-4506de4f4009
-      m_Path: 2DVector
-      m_Interactions: 
-      m_Processors: 
-      m_Groups: 
-      m_Action: Movimiento
-      m_Flags: 4
-    - m_Name: up
-      m_Id: cc6c22aa-7c1d-4fea-81be-dcd18662e1a8
-      m_Path: <Gamepad>/leftStick/up
-      m_Interactions: 
-      m_Processors: 
-      m_Groups: 
-      m_Action: Movimiento
-      m_Flags: 8
-    - m_Name: down
-      m_Id: aad0f3ea-fd78-4866-b5ed-dcf6cdd6d5a2
-      m_Path: <Gamepad>/rightStick/down
-      m_Interactions: 
-      m_Processors: 
-      m_Groups: 
-      m_Action: Movimiento
-      m_Flags: 8
-    - m_Name: left
-      m_Id: 89889928-dc81-4b64-9245-ac4ccbe20c35
-      m_Path: <Gamepad>/leftStick/left
-      m_Interactions: 
-      m_Processors: 
-      m_Groups: 
-      m_Action: Movimiento
-      m_Flags: 8
-    - m_Name: right
-      m_Id: 23457a3c-6446-420b-8749-36731e14dad5
-      m_Path: <Gamepad>/leftStick/right
-      m_Interactions: 
-      m_Processors: 
-      m_Groups: 
-      m_Action: Movimiento
-      m_Flags: 8
-    m_Flags: 0
-  gravedad: 9.81
-  carriles:
-  - nombre: Camino Mohan
-    puntosCarril:
-    - {fileID: 0}
-    - {fileID: 0}
-    puntoFinal: {fileID: 0}
-    nombreTemplo: Mohan
-  fuerzaAtraccion: 10
-  desviacionMaxima: 3
-  posicionInicioTemplo: {fileID: 0}
-  posicionSalidaTemplo: {fileID: 0}
-  gameManager: {fileID: 0}
-  videoNarrativa: {fileID: 0}
 --- !u!143 &2013604208
 CharacterController:
   m_ObjectHideFlags: 0

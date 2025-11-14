@@ -108,11 +108,11 @@ public class GameManager : MonoBehaviour
             uiManager.ActualizarUI();
         
         // Notificar al movimiento que el puzzle terminó
-        MovimientoGamepad movimiento = FindObjectOfType<MovimientoGamepad>();
+        /* MovimientoGamepad movimiento = FindObjectOfType<MovimientoGamepad>();
         if (movimiento != null)
         {
             movimiento.PuzzleTerminado();
-        }
+        } */
         
         // Verificar victoria
         VerificarFinDelJuego();

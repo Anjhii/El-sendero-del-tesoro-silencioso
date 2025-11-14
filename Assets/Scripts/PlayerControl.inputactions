@@ -34,7 +34,7 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "Lane3",
+                    "name": "X",
                     "type": "Button",
                     "id": "8ea7cfba-58ac-4593-b1f9-27be2226b893",
                     "expectedControlType": "",
@@ -43,7 +43,7 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "Lane4",
+                    "name": "B",
                     "type": "Button",
                     "id": "d9a1f652-8f4c-4bfb-a12d-90ef581d9616",
                     "expectedControlType": "",
@@ -52,9 +52,18 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "Stop",
+                    "name": "A",
                     "type": "Button",
                     "id": "28e2bbb4-8111-44d0-841b-542b090268ed",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Y",
+                    "type": "Button",
+                    "id": "65532c0f-cacf-4ca9-a080-ab36a524544c",
                     "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
@@ -102,7 +111,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "Lane3",
+                    "action": "X",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -113,7 +122,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "Lane4",
+                    "action": "B",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -124,7 +133,18 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "Stop",
+                    "action": "A",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "07a58480-a584-4230-9658-4d8859c2a01b",
+                    "path": "<Gamepad>/buttonNorth",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Y",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }
