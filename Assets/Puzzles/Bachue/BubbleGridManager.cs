@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+/* using System.Collections.Generic;
 using UnityEngine;
 
 public class BubbleGridManager : MonoBehaviour
@@ -47,7 +47,7 @@ public class BubbleGridManager : MonoBehaviour
         allBubbles.Clear();
 
         // posición base centrada en X
-        Vector3 origin = Camera.main.transform.position + Camera.main.transform.forward * gridDistance;
+        Vector3 origin = gridRoot.position;
         float startX = -(columns - 1) * 0.5f * bubbleSpacing;
         float startY = (rows - 1) * 0.5f * bubbleSpacing;
 
@@ -109,10 +109,17 @@ public class BubbleGridManager : MonoBehaviour
 
     void SnapToNearest(Bubble bubble)
     {
-        // buscar otras burbujas cercanas; si encuentra un hueco, aproximar - para simplicidad hacemos nothing
-        // (puedes mejorar para ajustar posiciones en rejilla)
-        // por ahora dejamos la posición tal cual; la detección por proximidad funcionará
+        Vector3 localPos = gridRoot.InverseTransformPoint(bubble.transform.position);
+
+        float step = bubbleSpacing;
+        float snapX = Mathf.Round(localPos.x / step) * step;
+        float snapY = Mathf.Round(localPos.y / step) * step;
+
+        Vector3 snappedWorld = gridRoot.TransformPoint(new Vector3(snapX, snapY, 0f));
+
+        bubble.transform.position = snappedWorld;
     }
+
 
     void CheckForGroups(Bubble startBubble)
     {
@@ -162,6 +169,164 @@ public class BubbleGridManager : MonoBehaviour
                 // regenerar pequeña pausa
                 Invoke(nameof(GenerateInitialGrid), 0.5f);
             }
+        }
+    }
+}
+ */
+
+using System.Collections.Generic;
+using UnityEngine;
+
+public class BubbleGridManager : MonoBehaviour
+{
+    [Header("Grid Settings")]
+    public Transform gridRoot;
+    public GameObject bubblePrefab;
+    public int rows = 6;
+    public int columns = 8;
+    public float bubbleSpacing = 0.18f;
+    public LayerMask bubbleLayer;
+
+    [Header("Matching")]
+    public float neighborRadius = 0.25f;
+    public int minMatchSize = 3;
+    public int pointsPerBubble = 10;
+
+    [Header("References")]
+    public ScoreManagerBubble scoreManager;
+
+    private List<Bubble> allBubbles = new List<Bubble>();
+
+    private void Awake()
+    {
+        if (gridRoot == null) 
+            gridRoot = this.transform;
+    }
+
+    private void Start()
+    {
+        GenerateInitialGrid();
+    }
+
+    public void GenerateInitialGrid()
+    {
+        if (bubblePrefab == null) return;
+
+        // Limpiar grid previa
+        for (int i = gridRoot.childCount - 1; i >= 0; i--)
+            DestroyImmediate(gridRoot.GetChild(i).gameObject);
+
+        allBubbles.Clear();
+
+        Vector3 origin = gridRoot.position;
+
+        float startX = -(columns - 1) * 0.5f * bubbleSpacing;
+        float startY = (rows - 1) * 0.5f * bubbleSpacing;
+
+        for (int r = 0; r < rows; r++)
+        {
+            for (int c = 0; c < columns; c++)
+            {
+                float offsetX = (r % 2 == 0) ? 0f : bubbleSpacing * 0.5f;
+
+                Vector3 pos = origin + new Vector3(
+                    startX + c * bubbleSpacing + offsetX,
+                    startY - r * bubbleSpacing,
+                    0f
+                );
+
+                GameObject go = Instantiate(bubblePrefab, pos, Quaternion.identity, gridRoot);
+                Bubble b = go.GetComponent<Bubble>();
+
+                if (b != null)
+                {
+                    b.gridManager = this;
+                    if (b.colorMaterials != null && b.colorMaterials.Length > 0)
+                        b.SetRandomColor();
+                }
+
+                Rigidbody rb = go.GetComponent<Rigidbody>();
+                if (rb != null)
+                    rb.isKinematic = true;
+
+                allBubbles.Add(b);
+            }
+        }
+    }
+
+    public void RegisterBubble(Bubble newBubble)
+    {
+        if (newBubble == null) return;
+
+        if (!allBubbles.Contains(newBubble))
+            allBubbles.Add(newBubble);
+
+        SnapToNearest(newBubble);
+        CheckForGroups(newBubble);
+    }
+
+    private void SnapToNearest(Bubble bubble)
+    {
+        Vector3 localPos = gridRoot.InverseTransformPoint(bubble.transform.position);
+
+        float step = bubbleSpacing;
+
+        float snapX = Mathf.Round(localPos.x / step) * step;
+        float snapY = Mathf.Round(localPos.y / step) * step;
+
+        Vector3 snappedWorld = gridRoot.TransformPoint(
+            new Vector3(snapX, snapY, 0f)
+        );
+
+        bubble.transform.position = snappedWorld;
+    }
+
+    private void CheckForGroups(Bubble startBubble)
+    {
+        List<Bubble> group = new List<Bubble>();
+        Queue<Bubble> queue = new Queue<Bubble>();
+        HashSet<Bubble> visited = new HashSet<Bubble>();
+
+        queue.Enqueue(startBubble);
+        visited.Add(startBubble);
+
+        while (queue.Count > 0)
+        {
+            Bubble current = queue.Dequeue();
+            group.Add(current);
+
+            Collider[] hits = Physics.OverlapSphere(
+                current.transform.position,
+                neighborRadius,
+                bubbleLayer
+            );
+
+            foreach (Collider hit in hits)
+            {
+                Bubble neighbor = hit.GetComponent<Bubble>();
+                if (neighbor != null &&
+                    neighbor.colorId == startBubble.colorId &&
+                    !visited.Contains(neighbor))
+                {
+                    visited.Add(neighbor);
+                    queue.Enqueue(neighbor);
+                }
+            }
+        }
+
+        if (group.Count >= minMatchSize)
+        {
+            foreach (Bubble b in group)
+            {
+                allBubbles.Remove(b);
+                Destroy(b.gameObject);
+            }
+
+            if (scoreManager != null)
+                scoreManager.AddScore(group.Count * pointsPerBubble);
+
+            if (allBubbles.Count == 0)
+                Invoke(nameof(GenerateInitialGrid), 0.5f);
         }
     }
 }

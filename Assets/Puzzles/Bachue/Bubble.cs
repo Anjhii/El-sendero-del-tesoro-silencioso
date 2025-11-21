@@ -1,4 +1,4 @@
-using UnityEngine;
+/* using UnityEngine;
 
 [RequireComponent(typeof(Renderer), typeof(Rigidbody), typeof(SphereCollider))]
 public class Bubble : MonoBehaviour
@@ -104,4 +104,80 @@ public class Bubble : MonoBehaviour
             }
         }
     }
+} */
+
+using UnityEngine;
+
+[RequireComponent(typeof(Renderer), typeof(Rigidbody), typeof(SphereCollider))]
+public class Bubble : MonoBehaviour
+{
+    public int colorId;
+    public Material[] colorMaterials;
+    public float maxLifetime = 10f;
+    public string bubbleTag = "Bubble";
+    public BubbleGridManager gridManager;
+
+    Rigidbody rb;
+    Renderer rend;
+    float birthTime;
+
+    void Awake()
+    {
+        rend = GetComponent<Renderer>();
+        rb = GetComponent<Rigidbody>();
+
+        gameObject.tag = bubbleTag;
+
+        if (gridManager == null)
+            gridManager = FindObjectOfType<BubbleGridManager>();
+
+        birthTime = Time.time;
+    }
+
+    void Start()
+    {
+        if (colorMaterials != null && colorMaterials.Length > 0)
+            SetColorById(colorId);
+    }
+
+    void Update()
+    {
+        if (!rb.isKinematic && Time.time - birthTime > maxLifetime)
+            Destroy(gameObject);
+    }
+
+    public void SetRandomColor()
+    {
+        colorId = Random.Range(0, colorMaterials.Length);
+        SetColorById(colorId);
+    }
+
+    public void SetColorById(int id)
+    {
+        rend.material = colorMaterials[id];
+    }
+
+    private void OnCollisionEnter(Collision collision)
+    {
+        if (rb == null) return;
+        if (rb.isKinematic) return;
+
+        bool hitBubble = collision.gameObject.CompareTag("Bubble");
+        bool hitGrid = collision.gameObject.CompareTag("BubbleGrid");
+
+        // 🔥 NO PEGAR si la velocidad es casi cero (colisiones falsas)
+        if ((hitBubble || hitGrid) && rb.velocity.magnitude > 0.05f)
+        {
+            rb.velocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            rb.isKinematic = true;
+
+            transform.position += collision.contacts[0].normal * 0.001f;
+
+            transform.SetParent(gridManager.gridRoot);
+            gridManager.RegisterBubble(this);
+        }
+    }
+
+
 }

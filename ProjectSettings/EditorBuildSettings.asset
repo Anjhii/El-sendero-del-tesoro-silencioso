@@ -5,7 +5,7 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/LoginScene.unity
     guid: 2d421b13353413b4f800b8c2456d360b
   - enabled: 1
@@ -14,7 +14,7 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/Mohan_Puzzle.unity
     guid: d3f50ad49ba767248afba62dc409afcd
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/Bachue_Puzzle.unity
     guid: 21845c60b10dbe84394a0264a2a3615e
   m_configObjects:

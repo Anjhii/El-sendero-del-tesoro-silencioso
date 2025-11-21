@@ -8,7 +8,6 @@ TagManager:
   - HitZone
   - Note
   - Bubble
-  - BubbleGrid
   layers:
   - Default
   - TransparentFX
@@ -21,7 +20,7 @@ TagManager:
   - 
   - Interactable
   - Bubbles
-  - 
+  - Walls
   - 
   - 
   - 

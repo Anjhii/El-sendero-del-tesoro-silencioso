@@ -3,104 +3,157 @@ using UnityEngine.InputSystem;
 
 public class BubbleShooterController : MonoBehaviour
 {
-    [Header("Input Actions")]
+    [Header("Input Actions")] 
     [SerializeField] private InputActionReference moveAction;
     [SerializeField] private InputActionReference fireAction;
 
-    [Header("Shooting Configuration")]
-    [SerializeField] private Transform cannon;
-    [SerializeField] private Transform spawnPoint;
-    [SerializeField] private GameObject bubblePrefab;
-    [SerializeField] private float shootForce = 0.8f;
-    [SerializeField] private float rotationSpeed = 60f;
-    [SerializeField] private float maxRotationAngle = 45f;
+    [Header("References")]
+    public Transform cannonRoot;
+    public Transform spawnPoint;
+    public LineRenderer aimLine;
+    public GameObject bubblePrefab;
 
-    [Header("Optional Audio")]
-    [SerializeField] private AudioClip shootSound;
-    private AudioSource audioSource;
+    [Header("Settings")]
+    public float rotationSpeed = 80f;
+    public float maxRotationAngle = 60f;
+    public float aimDistance = 3f;
+    public float shootForce = 25f;
+    public LayerMask wallMask;
+    public int maxBounces = 2;
 
-    private float currentRotation = 0f;
-    private bool canShoot = true;
-    private float shootCooldown = 0.3f;
-    private float lastShootTime;
+    private float cannonAngle = 0f;
+    private GameObject loadedBubble;
 
     private void OnEnable()
     {
-        if (moveAction != null) moveAction.action.Enable();
-        if (fireAction != null) fireAction.action.Enable();
+        moveAction?.action.Enable();
+        fireAction?.action.Enable();
     }
 
     private void OnDisable()
     {
-        if (moveAction != null) moveAction.action.Disable();
-        if (fireAction != null) fireAction.action.Disable();
+        moveAction?.action.Disable();
+        fireAction?.action.Disable();
     }
 
     private void Start()
     {
-        audioSource = GetComponent<AudioSource>();
-        if (audioSource == null && shootSound != null)
-        {
-            audioSource = gameObject.AddComponent<AudioSource>();
-        }
+        LoadBubble();
     }
 
     private void Update()
     {
         HandleRotation();
-        HandleShooting();
+        UpdateAimLine();
+        HandleShoot();
     }
 
     private void HandleRotation()
     {
-        if (moveAction == null || cannon == null) return;
+        float x = moveAction.action.ReadValue<Vector2>().x;
+        if (Mathf.Abs(x) < 0.01f) return;
 
-        Vector2 moveInput = moveAction.action.ReadValue<Vector2>();
-        float horizontalInput = moveInput.x;
+        cannonAngle += x * rotationSpeed * Time.deltaTime;
 
-        if (Mathf.Abs(horizontalInput) > 0.1f)
-        {
-            float targetRotation = currentRotation + (horizontalInput * rotationSpeed * Time.deltaTime);
-            currentRotation = Mathf.Clamp(targetRotation, -maxRotationAngle, maxRotationAngle);
-            
-            cannon.localRotation = Quaternion.Euler(0f, currentRotation, 0f);
-        }
+        // Normalización (-180, +180)
+        if (cannonAngle > 180f) cannonAngle -= 360f;
+        if (cannonAngle < -180f) cannonAngle += 360f;
+
+        cannonAngle = Mathf.Clamp(cannonAngle, -maxRotationAngle, maxRotationAngle);
+
+        if (cannonRoot)
+            cannonRoot.localRotation = Quaternion.Euler(0, 0, cannonAngle);
     }
 
-    private void HandleShooting()
+    private void UpdateAimLine()
     {
-        if (fireAction == null || !canShoot) return;
+        if (!aimLine || !spawnPoint) return;
 
-        if (Time.time - lastShootTime < shootCooldown) return;
-
-        if (fireAction.action.triggered || fireAction.action.ReadValue<float>() > 0.5f)
-        {
-            ShootBubble();
-            lastShootTime = Time.time;
-        }
-    }
-
-    private void ShootBubble()
-    {
-        if (bubblePrefab == null || spawnPoint == null) return;
-
-        GameObject bubble = Instantiate(bubblePrefab, spawnPoint.position, spawnPoint.rotation);
+        Vector3 origin = spawnPoint.position;
         
-        Rigidbody rb = bubble.GetComponent<Rigidbody>();
-        if (rb != null)
+        // 🔥 Calcular dirección basada en la rotación del cañón
+        // El ángulo 0° apunta hacia arriba (90° en Unity 2D)
+        float angleRad = (90f + cannonAngle) * Mathf.Deg2Rad;
+        Vector3 dir = new Vector3(Mathf.Cos(angleRad), Mathf.Sin(angleRad), 0f).normalized;
+
+        aimLine.positionCount = 1;
+        aimLine.SetPosition(0, origin);
+
+        float remaining = aimDistance;
+        int index = 1;
+
+        for (int i = 0; i < maxBounces; i++)
         {
-            rb.AddForce(spawnPoint.forward * shootForce, ForceMode.Impulse);
+            if (Physics.Raycast(origin, dir, out RaycastHit hit, remaining, wallMask))
+            {
+                aimLine.positionCount = index + 1;
+                aimLine.SetPosition(index, hit.point);
+
+                remaining -= hit.distance;
+                origin = hit.point;
+
+                dir = Vector3.Reflect(dir, hit.normal);
+                dir.z = 0;
+                dir.Normalize();
+
+                index++;
+            }
+            else
+            {
+                aimLine.positionCount = index + 1;
+                aimLine.SetPosition(index, origin + dir * remaining);
+                break;
+            }
+        }
+    }
+
+    private void HandleShoot()
+    {
+        if (fireAction.action.triggered)
+            Shoot();
+    }
+
+    private void LoadBubble()
+    {
+        if (!bubblePrefab || !spawnPoint) return;
+
+        loadedBubble = Instantiate(bubblePrefab, spawnPoint.position, Quaternion.identity, spawnPoint);
+
+        if (loadedBubble.TryGetComponent(out Rigidbody rb))
+        {
+            rb.isKinematic = true;
+            rb.useGravity = false;
         }
 
-        Bubble bubbleScript = bubble.GetComponent<Bubble>();
-        if (bubbleScript != null)
+        if (loadedBubble.TryGetComponent(out Bubble b))
+            b.SetRandomColor();
+    }
+
+    private void Shoot()
+    {
+        if (!loadedBubble) return;
+
+        loadedBubble.transform.SetParent(null);
+
+        if (!loadedBubble.TryGetComponent(out Rigidbody rb))
         {
-            bubbleScript.SetRandomColor();
+            Destroy(loadedBubble);
+            LoadBubble();
+            return;
         }
 
-        if (audioSource != null && shootSound != null)
-        {
-            audioSource.PlayOneShot(shootSound);
-        }
+        rb.isKinematic = false;
+        rb.useGravity = false;
+        rb.velocity = Vector3.zero;
+        rb.angularVelocity = Vector3.zero;
+
+        // 🔥 Calcular dirección de disparo basada en la rotación del cañón
+        float angleRad = (90f + cannonAngle) * Mathf.Deg2Rad;
+        Vector3 fireDirection = new Vector3(Mathf.Cos(angleRad), Mathf.Sin(angleRad), 0f).normalized;
+
+        rb.velocity = fireDirection * shootForce;
+
+        loadedBubble = null;
+        LoadBubble();
     }
 }
