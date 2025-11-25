@@ -36,13 +36,24 @@ public class BubbleShooterController : MonoBehaviour
         fireAction?.action.Disable();
     }
 
+    private bool isGameActive = false;
+
     private void Start()
     {
-        LoadBubble();
+        if (aimLine != null) aimLine.enabled = false;
+        Invoke(nameof(StartShooter), 13.0f);
+    }
+
+    private void StartShooter()
+    {
+        isGameActive = true;
+        if (aimLine != null) aimLine.enabled = true;
+        LoadBubble(); // Ahora sí cargamos la primera bola
     }
 
     private void Update()
     {
+        if (!isGameActive) return;
         HandleRotation();
         UpdateAimLine();
         HandleShoot();

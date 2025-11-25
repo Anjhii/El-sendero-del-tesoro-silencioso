@@ -32,7 +32,8 @@ public class BubbleGridManager : MonoBehaviour
 
     private void Start()
     {
-        GenerateInitialGrid();
+        // Lo programamos para que se ejecute en 13 segundos.
+        Invoke(nameof(GenerateInitialGrid), 13.0f);
     }
 
     public void GenerateInitialGrid()
@@ -389,5 +390,11 @@ public class BubbleGridManager : MonoBehaviour
             // Destruir el efecto visual después de 1 segundo para limpiar memoria
             Destroy(vfx, 1.0f);
         }
+    }
+
+    // Getter para saber cuántas bolas quedan
+    public int GetBubbleCount()
+    {
+        return allBubbles.Count;
     }
 }
