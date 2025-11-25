@@ -16,6 +16,9 @@ public class BubbleGridManager : MonoBehaviour
     public int minMatchSize = 3;
     public int pointsPerBubble = 10;
 
+    [Header("VFX")]
+    public GameObject popEffectPrefab; // Arrastra aquí tu prefab 'BubblePop'
+
     [Header("References")]
     public ScoreManagerBubble scoreManager;
 
@@ -273,7 +276,14 @@ public class BubbleGridManager : MonoBehaviour
             {
                 if (b != null)
                 {
-                    allBubbles.Remove(b); // Sacar de la lista global
+                    // OBTENER EL COLOR ANTES DE DESTRUIR
+                    Color bColor = Color.white;
+                    if(b.TryGetComponent(out Renderer r)) bColor = r.material.color;
+
+                    // EFECTO VISUAL
+                    PlayPopEffect(b.transform.position, bColor);
+
+                    allBubbles.Remove(b);
                     Destroy(b.gameObject);
                 }
             }
@@ -338,25 +348,46 @@ public class BubbleGridManager : MonoBehaviour
             }
         }
 
-        // 4. Hacer caer las flotantes
+        // 4. ELIMINAR FLOTANTES CON EXPLOSIÓN
         foreach (Bubble b in floatingBubbles)
         {
-            allBubbles.Remove(b); // Sacar de la lista lógica
-            
             if (b != null)
             {
-                Rigidbody rb = b.GetComponent<Rigidbody>();
-                if (rb != null)
-                {
-                    rb.isKinematic = false; // Reactivar físicas
-                    rb.useGravity = true;   // Que caiga
-                    
-                    // Empuje aleatorio pequeño para que se vea natural
-                    rb.AddForce(new Vector3(Random.Range(-1f, 1f), 0, 0), ForceMode.Impulse);
-                }
-                // Destruir después de 2 segundos
-                Destroy(b.gameObject, 2.0f);
+                // OBTENER COLOR
+                Color bColor = Color.white;
+                if (b.TryGetComponent(out Renderer r)) bColor = r.material.color;
+
+                // EFECTO VISUAL
+                PlayPopEffect(b.transform.position, bColor);
+
+                // LOGICA DE DESTRUCCIÓN
+                allBubbles.Remove(b);
+                Destroy(b.gameObject); // Destrucción inmediata o con pequeño delay secuencial
+                
+                // Opcional: Sumar puntos extra por islas caídas
+                if(scoreManager != null) scoreManager.AddScore(pointsPerBubble * 2); 
             }
+        }
+    }
+
+
+    private void PlayPopEffect(Vector3 position, Color bubbleColor)
+    {
+        if (popEffectPrefab != null)
+        {
+            // Instanciar la explosión
+            GameObject vfx = Instantiate(popEffectPrefab, position, Quaternion.identity);
+            
+            // Asignar el color de la bola a las partículas
+            var ps = vfx.GetComponent<ParticleSystem>();
+            if (ps != null)
+            {
+                var main = ps.main;
+                main.startColor = bubbleColor; // Pinta las partículas
+            }
+
+            // Destruir el efecto visual después de 1 segundo para limpiar memoria
+            Destroy(vfx, 1.0f);
         }
     }
 }
