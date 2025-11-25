@@ -159,21 +159,32 @@ public class Bubble : MonoBehaviour
 
     private void OnCollisionEnter(Collision collision)
     {
-        if (rb == null) return;
-        if (rb.isKinematic) return;
+        if (rb == null || rb.isKinematic) return;
 
         bool hitBubble = collision.gameObject.CompareTag("Bubble");
-        bool hitGrid = collision.gameObject.CompareTag("BubbleGrid");
+        bool hitGrid = collision.gameObject.CompareTag("BubbleGrid"); // Asegúrate de que tu GridRoot tenga este tag o usa "Untagged" si no lo tiene.
 
-        // 🔥 NO PEGAR si la velocidad es casi cero (colisiones falsas)
-        if ((hitBubble || hitGrid) && rb.velocity.magnitude > 0.05f)
+        // ELIMINAMOS el chequeo estricto de velocidad. 
+        // Si colisionó con una burbuja o el techo, se debe pegar.
+        if (hitBubble || hitGrid)
         {
-            rb.velocity = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
-            rb.isKinematic = true;
+            StickToGrid(collision);
+        }
+    }
 
-            transform.position += collision.contacts[0].normal * 0.001f;
+    private void StickToGrid(Collision collision)
+    {
+        rb.velocity = Vector3.zero;
+        rb.angularVelocity = Vector3.zero;
+        rb.isKinematic = true;
+        rb.detectCollisions = false; // Evita que otras bolas reboten en esta mientras se procesa
 
+        // Ajuste fino para evitar superposición visual
+        if(collision.contacts.Length > 0)
+            transform.position += collision.contacts[0].normal * 0.01f;
+
+        if (gridManager != null)
+        {
             transform.SetParent(gridManager.gridRoot);
             gridManager.RegisterBubble(this);
         }

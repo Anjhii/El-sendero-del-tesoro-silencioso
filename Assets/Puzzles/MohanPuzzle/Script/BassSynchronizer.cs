@@ -30,24 +30,27 @@ public class BassSynchronizer : MonoBehaviour
     
     [Header("Ajustes Tiempo")]
     public float noteLeadTime = 2f;
-    public float startDelay = 3f;
+    public float tutorialDuration = 5f;
 
-    [Header("UI Elements - TMPro")]
-    public TextMeshProUGUI statusText;
-    public TextMeshProUGUI notesRemainingText;
-    public TextMeshProUGUI volumeText;
-    public TextMeshProUGUI volumePercentageText; // Nuevo: porcentaje de volumen
-    public Slider volumeSlider;
-    public Button startStopButton;
-    public TextMeshProUGUI startStopButtonText;
-    public TextMeshProUGUI controlsText;
-    public TextMeshProUGUI totalNotesText; // Nuevo: notas totales
+    [Header("UI Elements - Tutorial")]
+    public GameObject tutorialPanel; // Panel con imagen de controles
+    public TextMeshProUGUI exitTutorialText; // Texto "Y para salir"
+    
+    [Header("UI Elements - Pre-Game")]
+    public TextMeshProUGUI pressAText; // "Presione A para jugar"
+    public TextMeshProUGUI countdownText; // Contador 3, 2, 1
+
+    [Header("UI Elements - In-Game")]
+    public TextMeshProUGUI notesRemainingText; // Notas restantes durante el juego
+
+    [Header("UI Elements - End Game")]
+    public GameObject endGamePanel; // Panel mensaje final
+    public TextMeshProUGUI endGameText; // "Has obtenido un fragmento de una balsa"
 
     [Header("Input Actions")]
-    public InputActionReference startStopAction;
-    public InputActionReference volumeUpAction;
-    public InputActionReference volumeDownAction;
-    public InputActionReference navigateAction;
+    public InputActionReference startGameAction; // Botón A
+    public InputActionReference exitAction; // Botón Y
+    public InputActionReference destroyNotesAction; // RB/LB/RT/LT
     
     // Configuración interna
     private float detectionThreshold = 0.3f;
@@ -58,9 +61,21 @@ public class BassSynchronizer : MonoBehaviour
     private List<BassNote> upcomingNotes = new List<BassNote>();
     private int currentNoteIndex = 0;
     private bool analysisComplete = false;
+    private bool tutorialComplete = false;
     private bool gameStarted = false;
-    private bool uiSelectionMode = false;
     private int totalNotes = 0;
+
+    // Estados del juego
+    private enum GameState
+    {
+        Loading,
+        Tutorial,
+        WaitingForStart,
+        Countdown,
+        Playing,
+        Finished
+    }
+    private GameState currentState = GameState.Loading;
 
     void Start()
     {
@@ -75,7 +90,7 @@ public class BassSynchronizer : MonoBehaviour
         bassSource.playOnAwake = false;
         bassSource.volume = bassVolume;
 
-        // Configurar música principal si existe
+        // Configurar música principal
         if (mainMusicSource != null)
         {
             mainMusicSource.playOnAwake = false;
@@ -85,128 +100,210 @@ public class BassSynchronizer : MonoBehaviour
         // Configurar Input System
         SetupInputSystem();
 
-        // Configurar UI
-        SetupUI();
+        // Inicializar UI
+        InitializeUI();
 
-        // Análisis automático interno
+        // Análisis automático y mostrar tutorial
         if (bassTrack != null)
         {
-            AnalyzeBassTrack();
+            StartCoroutine(LoadAndShowTutorial());
         }
         else
         {
-            UpdateStatus("❌ No hay pista de bajo");
+            Debug.LogError("No hay pista de bajo asignada");
         }
     }
 
     void SetupInputSystem()
     {
-        // Configurar acciones de input
-        if (startStopAction != null)
+        if (startGameAction != null)
         {
-            startStopAction.action.Enable();
-            startStopAction.action.performed += OnStartStopPerformed;
+            startGameAction.action.Enable();
+            startGameAction.action.performed += OnStartGamePressed;
         }
 
-        if (volumeUpAction != null)
+        if (exitAction != null)
         {
-            volumeUpAction.action.Enable();
-            volumeUpAction.action.performed += OnVolumeUpPerformed;
+            exitAction.action.Enable();
+            exitAction.action.performed += OnExitPressed;
         }
 
-        if (volumeDownAction != null)
+        if (destroyNotesAction != null)
         {
-            volumeDownAction.action.Enable();
-            volumeDownAction.action.performed += OnVolumeDownPerformed;
-        }
-
-        if (navigateAction != null)
-        {
-            navigateAction.action.Enable();
-            navigateAction.action.performed += OnNavigatePerformed;
+            destroyNotesAction.action.Enable();
         }
     }
 
-    void SetupUI()
+    void InitializeUI()
     {
-        // Configurar slider de volumen
-        if (volumeSlider != null && mainMusicSource != null)
-        {
-            volumeSlider.value = mainMusicSource.volume;
-            volumeSlider.onValueChanged.AddListener(OnVolumeChanged);
-        }
-
-        // Configurar botón de inicio/parada
-        if (startStopButton != null)
-        {
-            startStopButton.onClick.AddListener(OnStartStopClicked);
-        }
-
-        // Actualizar UI inicial
-        UpdateUI();
+        // Ocultar todos los elementos UI al inicio
+        SetUIVisibility(tutorialPanel, false);
+        SetTextVisibility(exitTutorialText, false);
+        SetTextVisibility(pressAText, false);
+        SetTextVisibility(countdownText, false);
+        SetTextVisibility(notesRemainingText, false);
+        SetUIVisibility(endGamePanel, false);
     }
 
-    void OnEnable()
+    // ========== COROUTINES DE FLUJO DEL JUEGO ==========
+
+    IEnumerator LoadAndShowTutorial()
     {
-        // Asegurar que las acciones estén habilitadas
-        startStopAction?.action.Enable();
-        volumeUpAction?.action.Enable();
-        volumeDownAction?.action.Enable();
-        navigateAction?.action.Enable();
+        currentState = GameState.Loading;
+        
+        // Analizar pista de bajo
+        AnalyzeBassTrack();
+        
+        // Esperar a que el análisis complete
+        while (!analysisComplete)
+        {
+            yield return null;
+        }
+
+        // Mostrar tutorial
+        currentState = GameState.Tutorial;
+        ShowTutorial();
+        
+        // Esperar 5 segundos
+        yield return new WaitForSeconds(tutorialDuration);
+        
+        // Pasar a esperar inicio
+        tutorialComplete = true;
+        currentState = GameState.WaitingForStart;
+        ShowWaitingForStart();
     }
 
-    void OnDisable()
+    void ShowTutorial()
     {
-        // Deshabilitar acciones cuando el objeto se desactive
-        startStopAction?.action.Disable();
-        volumeUpAction?.action.Disable();
-        volumeDownAction?.action.Disable();
-        navigateAction?.action.Disable();
+        SetUIVisibility(tutorialPanel, true);
+        SetTextVisibility(exitTutorialText, true);
+        
+        if (exitTutorialText != null)
+        {
+            exitTutorialText.text = "Y para salir";
+        }
+    }
+
+    void ShowWaitingForStart()
+    {
+        // Ocultar tutorial
+        SetUIVisibility(tutorialPanel, false);
+        SetTextVisibility(exitTutorialText, false);
+        
+        // Mostrar mensaje de inicio
+        SetTextVisibility(pressAText, true);
+        if (pressAText != null)
+        {
+            pressAText.text = "Presione A para jugar";
+        }
+    }
+
+    IEnumerator StartGameSequence()
+    {
+        currentState = GameState.Countdown;
+        
+        // Ocultar mensaje de inicio
+        SetTextVisibility(pressAText, false);
+        
+        // Mostrar countdown
+        SetTextVisibility(countdownText, true);
+        
+        for (int i = 3; i > 0; i--)
+        {
+            if (countdownText != null)
+            {
+                countdownText.text = i.ToString();
+            }
+            yield return new WaitForSeconds(1f);
+        }
+        
+        // Ocultar countdown
+        SetTextVisibility(countdownText, false);
+        
+        // Iniciar juego
+        currentState = GameState.Playing;
+        StartGame();
+    }
+
+    void StartGame()
+    {
+        // Mostrar notas restantes
+        SetTextVisibility(notesRemainingText, true);
+        UpdateNotesRemaining();
+        
+        // Reproducir música
+        if (mainMusicSource != null)
+        {
+            mainMusicSource.Play();
+        }
+        
+        bassSource.Play();
+        currentNoteIndex = 0;
+        gameStarted = true;
+        
+        StartCoroutine(SpawnNotesCoroutine());
+    }
+
+    IEnumerator SpawnNotesCoroutine()
+    {
+        while (currentNoteIndex < upcomingNotes.Count && bassSource.isPlaying)
+        {
+            BassNote nextNote = upcomingNotes[currentNoteIndex];
+            float timeUntilNote = nextNote.time - bassSource.time;
+            
+            if (timeUntilNote <= noteLeadTime && timeUntilNote >= -0.1f)
+            {
+                SpawnNote(nextNote.lane);
+                currentNoteIndex++;
+                UpdateNotesRemaining();
+                
+                // Verificar si terminó el juego
+                if (GetNotesRemaining() == 0)
+                {
+                    yield return new WaitForSeconds(2f); // Esperar un poco antes de mostrar mensaje final
+                    ShowEndGame();
+                    yield break;
+                }
+            }
+            
+            yield return null;
+        }
+    }
+
+    void ShowEndGame()
+    {
+        currentState = GameState.Finished;
+        gameStarted = false;
+        
+        // Ocultar notas restantes
+        SetTextVisibility(notesRemainingText, false);
+        
+        // Mostrar mensaje final
+        SetUIVisibility(endGamePanel, true);
+        if (endGameText != null)
+        {
+            endGameText.text = "¡Has obtenido un fragmento de una balsa!";
+        }
     }
 
     // ========== INPUT HANDLERS ==========
 
-    void OnStartStopPerformed(InputAction.CallbackContext context)
+    void OnStartGamePressed(InputAction.CallbackContext context)
     {
-        if (!gameStarted && analysisComplete)
+        if (currentState == GameState.WaitingForStart)
         {
-            StartGame();
-        }
-        else if (gameStarted)
-        {
-            StopGame();
-        }
-        UpdateUI();
-    }
-
-    void OnVolumeUpPerformed(InputAction.CallbackContext context)
-    {
-        if (mainMusicSource != null)
-        {
-            mainMusicSource.volume = Mathf.Min(1, mainMusicSource.volume + 0.1f);
-            if (volumeSlider != null) volumeSlider.value = mainMusicSource.volume;
-            UpdateUI();
+            StartCoroutine(StartGameSequence());
         }
     }
 
-    void OnVolumeDownPerformed(InputAction.CallbackContext context)
+    void OnExitPressed(InputAction.CallbackContext context)
     {
-        if (mainMusicSource != null)
+        if (currentState == GameState.Tutorial || currentState == GameState.WaitingForStart)
         {
-            mainMusicSource.volume = Mathf.Max(0, mainMusicSource.volume - 0.1f);
-            if (volumeSlider != null) volumeSlider.value = mainMusicSource.volume;
-            UpdateUI();
-        }
-    }
-
-    void OnNavigatePerformed(InputAction.CallbackContext context)
-    {
-        if (!uiSelectionMode && startStopButton != null)
-        {
-            // Activar modo selección UI
-            uiSelectionMode = true;
-            startStopButton.Select();
-            UpdateControlsText();
+            // Salir del juego o volver al menú principal
+            Debug.Log("Saliendo del nivel...");
+            // Aquí puedes agregar tu lógica para salir
+            // Por ejemplo: SceneManager.LoadScene("MainMenu");
         }
     }
 
@@ -216,7 +313,6 @@ public class BassSynchronizer : MonoBehaviour
     {
         if (bassTrack == null) return;
 
-        UpdateStatus("🔍 Analizando pista de bajo...");
         bassNotes.Clear();
 
         float[] samples = new float[bassTrack.samples * bassTrack.channels];
@@ -259,63 +355,13 @@ public class BassSynchronizer : MonoBehaviour
         upcomingNotes = new List<BassNote>(bassNotes);
         upcomingNotes.Sort((a, b) => a.time.CompareTo(b.time));
         
-        UpdateStatus($"Listo - {notesDetected} notas detectadas");
-        UpdateUI();
+        Debug.Log($"Análisis completo: {notesDetected} notas detectadas");
     }
 
     int GetLaneFromPattern(int noteIndex)
     {
         int[] pattern = { 0, 1, 2, 3, 0, 2, 1, 3 };
         return pattern[noteIndex % pattern.Length];
-    }
-
-    void StartGame()
-    {
-        if (!analysisComplete || bassNotes.Count == 0) return;
-
-        StartCoroutine(GameCoroutine());
-    }
-
-    IEnumerator GameCoroutine()
-    {
-        UpdateStatus("⏳ Iniciando en " + startDelay + " segundos...");
-        yield return new WaitForSeconds(startDelay);
-        
-        // Reproducir AMBAS pistas simultáneamente
-        if (mainMusicSource != null)
-        {
-            mainMusicSource.Play();
-        }
-        
-        bassSource.Play();
-        currentNoteIndex = 0;
-        gameStarted = true;
-        uiSelectionMode = false;
-        
-        UpdateStatus("🎸 ¡Juego en curso!");
-        StartCoroutine(SpawnNotesCoroutine());
-    }
-
-    IEnumerator SpawnNotesCoroutine()
-    {
-        while (currentNoteIndex < upcomingNotes.Count && bassSource.isPlaying)
-        {
-            BassNote nextNote = upcomingNotes[currentNoteIndex];
-            float timeUntilNote = nextNote.time - bassSource.time;
-            
-            if (timeUntilNote <= noteLeadTime && timeUntilNote >= -0.1f)
-            {
-                SpawnNote(nextNote.lane);
-                currentNoteIndex++;
-                UpdateUI();
-            }
-            
-            yield return null;
-        }
-        
-        UpdateStatus("🏁 Juego terminado!");
-        gameStarted = false;
-        UpdateUI();
     }
 
     void SpawnNote(int laneIndex)
@@ -326,128 +372,60 @@ public class BassSynchronizer : MonoBehaviour
         }
     }
 
-    void StopGame()
+    // ========== UI HELPERS ==========
+
+    void UpdateNotesRemaining()
     {
-        if (mainMusicSource != null) mainMusicSource.Stop();
-        if (bassSource != null) bassSource.Stop();
-        gameStarted = false;
-        UpdateStatus("⏹️ Juego parado");
-        UpdateUI();
-    }
-
-    // ========== UI METHODS ==========
-
-    void UpdateStatus(string message)
-    {
-        if (statusText != null)
+        if (notesRemainingText != null && gameStarted)
         {
-            statusText.text = message;
-        }
-        Debug.Log(message);
-    }
-
-    void UpdateUI()
-    {
-        // Actualizar texto de notas restantes
-        if (notesRemainingText != null)
-        {
-            if (gameStarted)
-            {
-                int remaining = Mathf.Max(0, upcomingNotes.Count - currentNoteIndex);
-                notesRemainingText.text = $"Notas Restantes: {remaining}";
-            }
-            else
-            {
-                notesRemainingText.text = analysisComplete ? "Listo para jugar" : "Analizando...";
-            }
-        }
-
-        // Actualizar texto de notas totales
-        if (totalNotesText != null)
-        {
-            totalNotesText.text = $"Notas Totales: {totalNotes}";
-        }
-
-        // Actualizar texto de volumen y porcentaje
-        if (mainMusicSource != null)
-        {
-            int volumePercent = Mathf.RoundToInt(mainMusicSource.volume * 100);
-            
-            if (volumeText != null)
-            {
-                volumeText.text = $"Volumen: {volumePercent}%";
-            }
-            
-            if (volumePercentageText != null)
-            {
-                volumePercentageText.text = $"{volumePercent}%";
-            }
-
-            // Actualizar slider si existe
-            if (volumeSlider != null && Mathf.Abs(volumeSlider.value - mainMusicSource.volume) > 0.01f)
-            {
-                volumeSlider.value = mainMusicSource.volume;
-            }
-        }
-
-        // Actualizar botón de inicio/parada
-        if (startStopButton != null && startStopButtonText != null)
-        {
-            if (gameStarted)
-            {
-                startStopButtonText.text = "PARAR JUEGO";
-                startStopButton.interactable = true;
-            }
-            else
-            {
-                startStopButtonText.text = "INICIAR JUEGO";
-                startStopButton.interactable = analysisComplete;
-            }
-        }
-
-        UpdateControlsText();
-    }
-
-    void UpdateControlsText()
-    {
-        if (controlsText != null)
-        {
-            if (uiSelectionMode)
-            {
-                controlsText.text = "CONTROLES MANDO:\n• A: Confirmar\n• B: Cancelar";
-            }
-            else
-            {
-                controlsText.text = "CONTROLES MANDO:\n• A: Iniciar/Parar\n• RB/LB/RT/LT: Destruir notas";
-            }
+            int remaining = GetNotesRemaining();
+            notesRemainingText.text = $"Notas Restantes: {remaining}";
         }
     }
 
-    void OnVolumeChanged(float volume)
+    int GetNotesRemaining()
     {
-        if (mainMusicSource != null)
+        return Mathf.Max(0, upcomingNotes.Count - currentNoteIndex);
+    }
+
+    void SetUIVisibility(GameObject uiElement, bool visible)
+    {
+        if (uiElement != null)
         {
-            mainMusicSource.volume = volume;
-            UpdateUI();
+            uiElement.SetActive(visible);
         }
     }
 
-    void OnStartStopClicked()
+    void SetTextVisibility(TextMeshProUGUI textElement, bool visible)
     {
-        if (!gameStarted && analysisComplete)
+        if (textElement != null)
         {
-            StartGame();
+            textElement.gameObject.SetActive(visible);
         }
-        else if (gameStarted)
-        {
-            StopGame();
-        }
-        UpdateUI();
     }
 
-    // Método público para actualizar desde otros scripts si es necesario
-    public void UpdateVolumeDisplay()
+    // ========== CLEANUP ==========
+
+    void OnEnable()
     {
-        UpdateUI();
+        startGameAction?.action.Enable();
+        exitAction?.action.Enable();
+        destroyNotesAction?.action.Enable();
+    }
+
+    void OnDisable()
+    {
+        startGameAction?.action.Disable();
+        exitAction?.action.Disable();
+        destroyNotesAction?.action.Disable();
+    }
+
+    void OnDestroy()
+    {
+        if (startGameAction != null)
+            startGameAction.action.performed -= OnStartGamePressed;
+        
+        if (exitAction != null)
+            exitAction.action.performed -= OnExitPressed;
     }
 }

@@ -135,25 +135,29 @@ public class BubbleShooterController : MonoBehaviour
 
         loadedBubble.transform.SetParent(null);
 
-        if (!loadedBubble.TryGetComponent(out Rigidbody rb))
+        if (loadedBubble.TryGetComponent(out Rigidbody rb))
         {
-            Destroy(loadedBubble);
-            LoadBubble();
-            return;
+            rb.isKinematic = false;
+            rb.useGravity = false;
+            
+            // Asegura las restricciones para evitar que se mueva en Z o rote raro
+            rb.constraints = RigidbodyConstraints.FreezePositionZ | RigidbodyConstraints.FreezeRotation; 
+
+            float angleRad = (90f + cannonAngle) * Mathf.Deg2Rad;
+            Vector3 fireDirection = new Vector3(Mathf.Cos(angleRad), Mathf.Sin(angleRad), 0f).normalized;
+
+            rb.velocity = fireDirection * shootForce;
         }
 
-        rb.isKinematic = false;
-        rb.useGravity = false;
-        rb.velocity = Vector3.zero;
-        rb.angularVelocity = Vector3.zero;
-
-        // 🔥 Calcular dirección de disparo basada en la rotación del cañón
-        float angleRad = (90f + cannonAngle) * Mathf.Deg2Rad;
-        Vector3 fireDirection = new Vector3(Mathf.Cos(angleRad), Mathf.Sin(angleRad), 0f).normalized;
-
-        rb.velocity = fireDirection * shootForce;
-
         loadedBubble = null;
+        
+        // ESPERAR antes de recargar para que la bola salga del área de spawn
+        StartCoroutine(ReloadDelay());
+    }
+
+    private System.Collections.IEnumerator ReloadDelay()
+    {
+        yield return new WaitForSeconds(0.2f); // Pequeña pausa
         LoadBubble();
     }
 }
