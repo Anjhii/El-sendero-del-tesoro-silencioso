@@ -162,33 +162,41 @@ public class Bubble : MonoBehaviour
         if (rb == null || rb.isKinematic) return;
 
         bool hitBubble = collision.gameObject.CompareTag("Bubble");
-        bool hitGrid = collision.gameObject.CompareTag("BubbleGrid"); // Asegúrate de que tu GridRoot tenga este tag o usa "Untagged" si no lo tiene.
+        // Añadimos chequeo explicito de Tag "Wall" si tu techo tiene tag Wall, o "BubbleGrid"
+        bool hitCeiling = collision.gameObject.CompareTag("BubbleGrid") || collision.gameObject.name.Contains("Top");
 
-        // ELIMINAMOS el chequeo estricto de velocidad. 
-        // Si colisionó con una burbuja o el techo, se debe pegar.
-        if (hitBubble || hitGrid)
+        if (hitBubble || hitCeiling)
         {
             StickToGrid(collision);
+        }
+        else
+        {
+            // Lógica de rebote normal contra paredes laterales
         }
     }
 
     private void StickToGrid(Collision collision)
     {
+        // 1. Detener físicas
         rb.velocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
         rb.isKinematic = true;
-        rb.detectCollisions = false; // Evita que otras bolas reboten en esta mientras se procesa
 
-        // Ajuste fino para evitar superposición visual
-        if(collision.contacts.Length > 0)
-            transform.position += collision.contacts[0].normal * 0.01f;
+        // 2. Cambiar Layer de forma SEGURA
+        // Solo cambiamos la layer si existe. Si no has creado la layer "GridBubble" en Unity, esto no dará error.
+        int layerIndex = LayerMask.NameToLayer("GridBubble");
+        if (layerIndex != -1) 
+        {
+            gameObject.layer = layerIndex;
+        }
 
+        // 3. Registrar en el manager
         if (gridManager != null)
         {
             transform.SetParent(gridManager.gridRoot);
-            gridManager.RegisterBubble(this);
+            // Usamos el punto de contacto para mayor precisión
+            Vector3 contactPoint = collision.GetContact(0).point; 
+            gridManager.RegisterBubble(this, contactPoint);
         }
     }
-
-
 }

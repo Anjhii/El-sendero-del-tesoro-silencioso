@@ -78,152 +78,215 @@ public class BubbleGridManager : MonoBehaviour
         }
     }
 
-    public void RegisterBubble(Bubble newBubble)
+    public void RegisterBubble(Bubble bubble, Vector3 impactPoint)
     {
-        if (newBubble == null) return;
-
-        if (!allBubbles.Contains(newBubble))
-            allBubbles.Add(newBubble);
-
-        SnapToNearest(newBubble);
-        CheckForGroups(newBubble);
+        SnapToNearest(bubble, impactPoint);
+        
+        // ... resto de tu lógica de añadir a la lista y buscar grupos ...
+        if (!allBubbles.Contains(bubble)) allBubbles.Add(bubble);
+        bubble.transform.localRotation = Quaternion.identity;
+        CheckForGroups(bubble);
     }
 
-    void SnapToNearest(Bubble bubble)
+    void SnapToNearest(Bubble bubble, Vector3 impactPoint)
     {
-        float stepX = bubbleSpacing;
-        float stepY = bubbleSpacing; // O bubbleSpacing * 0.866f si es hexagonal estricto
+        // Convertir punto de impacto a local
+        Vector3 localImpact = gridRoot.InverseTransformPoint(impactPoint);
 
-        Vector3 localPos = gridRoot.InverseTransformPoint(bubble.transform.position);
-
-        // 1. Calcular la posición ideal matemática
-        float snapX = Mathf.Round(localPos.x / stepX) * stepX;
-        float snapY = Mathf.Round(localPos.y / stepY) * stepY;
+        // Encontrar la coordenada hexagonal teórica más cercana al impacto
+        // Pero retrocediendo un poco hacia de donde vino la bola para no meterse DENTRO de la otra
+        // (Usamos la posición de la bola antes del snap como referencia de dirección)
+        Vector3 localBubblePos = gridRoot.InverseTransformPoint(bubble.transform.position);
+        Vector3 dir = (localBubblePos - localImpact).normalized;
         
-        // Ajuste para grilla hexagonal (filas alternas)
-        // Si usas grilla cuadrada simple, puedes ignorar este bloque 'if'
-        int gridRow = Mathf.RoundToInt(localPos.y / stepY);
-        if (Mathf.Abs(gridRow) % 2 == 1) // Si es fila impar, desplazar X
-        {
-            float offsetX = stepX * 0.5f;
-            // Recalcular snapX considerando el offset
-            snapX = (Mathf.Round((localPos.x - offsetX) / stepX) * stepX) + offsetX;
-        }
+        // "Retrocedemos" medio radio desde el impacto hacia afuera para encontrar el centro de celda ideal
+        Vector3 idealCenter = localImpact + (dir * bubbleSpacing * 0.5f);
 
-        Vector3 targetPos = gridRoot.TransformPoint(new Vector3(snapX, snapY, 0f));
+        float bestDist = float.MaxValue;
+        Vector3 finalPos = bubble.transform.position;
 
-        // 2. VERIFICACIÓN DE OCUPACIÓN
-        // Revisamos si ya hay UNA OTRA bola en esa posición (radio pequeño para ser precisos)
-        Collider[] hits = Physics.OverlapSphere(targetPos, bubbleSpacing * 0.4f, bubbleLayer);
-        bool isOccupied = false;
-        foreach(var hit in hits)
+        // Buscar en un radio pequeño alrededor del punto ideal cuál celda de la grilla está VACÍA
+        // Generamos candidatos alrededor
+        List<Vector3> candidates = GetHexNeighborPositions(idealCenter);
+        candidates.Add(GetHexPosition(idealCenter)); // Añadir la propia posición calculada
+
+        foreach (Vector3 candidate in candidates)
         {
-            if (hit.gameObject != bubble.gameObject) // Si choca con algo que no soy yo mismo
+            // Verificar si esta posición candidata ya está ocupada por OTRA bola
+            if (!IsOccupied(candidate, bubble))
             {
-                isOccupied = true;
-                break;
+                float d = Vector3.Distance(idealCenter, candidate);
+                if (d < bestDist)
+                {
+                    bestDist = d;
+                    finalPos = candidate;
+                }
             }
         }
 
-        // 3. Si está ocupado, buscar el vecino libre más cercano
-        if (isOccupied)
+        bubble.transform.localPosition = finalPos;
+    }
+
+    // Verifica si hay una bola en esa coordenada (con margen de error)
+    bool IsOccupied(Vector3 localPos, Bubble self)
+{
+    // Recorremos hacia atrás para poder eliminar elementos de la lista si es necesario
+    for (int i = allBubbles.Count - 1; i >= 0; i--)
+    {
+        Bubble b = allBubbles[i];
+
+        // CORRECCIÓN: Si la bola es null (fue destruida), la sacamos de la lista y continuamos
+        if (b == null || b.gameObject == null)
         {
-            targetPos = FindClosestFreeHexSpot(bubble.transform.position);
+            allBubbles.RemoveAt(i);
+            continue;
         }
 
-        // Aplicar posición final
-        bubble.transform.position = targetPos;
+        if (b == self) continue;
+
+        // Comprobación de distancia
+        if (Vector3.Distance(b.transform.localPosition, localPos) < bubbleSpacing * 0.5f)
+        {
+            return true; 
+        }
+    }
+    return false;
+}
+
+    // Convierte una posición arbitraria al centro de celda hexagonal más cercano
+    Vector3 GetHexPosition(Vector3 localPos)
+    {
+        float q = localPos.x / bubbleSpacing; // Columna aprox
+        float r = localPos.y / (bubbleSpacing * 0.866f); // Fila aprox (sin2 60 = 0.866)
+
+        int gridY = Mathf.RoundToInt(r);
+        // Si la fila es impar, desplazamos X por 0.5
+        float offsetX = (Mathf.Abs(gridY) % 2 == 1) ? 0.5f : 0.0f;
+        int gridX = Mathf.RoundToInt(q - offsetX);
+
+        float finalX = (gridX + offsetX) * bubbleSpacing;
+        float finalY = gridY * (bubbleSpacing * 0.866f);
+
+        return new Vector3(finalX, finalY, 0);
+    }
+
+    List<Vector3> GetHexNeighborPositions(Vector3 centerLocal)
+    {
+        List<Vector3> neighbors = new List<Vector3>();
+        // Direcciones hexagonales relativas
+        Vector3[] offsets = {
+            new Vector3(1, 0, 0), new Vector3(-1, 0, 0),
+            new Vector3(0.5f, 0.866f, 0), new Vector3(-0.5f, 0.866f, 0),
+            new Vector3(0.5f, -0.866f, 0), new Vector3(-0.5f, -0.866f, 0)
+        };
+
+        foreach(var off in offsets)
+        {
+            // Multiplicamos por spacing pero recalculamos el Grid Snap para precisión
+            neighbors.Add(GetHexPosition(centerLocal + off * bubbleSpacing)); 
+        }
+        return neighbors;
     }
 
 // Método auxiliar para buscar hueco libre alrededor
-Vector3 FindClosestFreeHexSpot(Vector3 currentWorldPos)
-{
-    // Definir las 6 direcciones hexagonales (aprox)
-    // Si tu grilla es cuadrada, usa Vector3.up, down, left, right
-    Vector3[] directions = new Vector3[]
+    Vector3 FindClosestFreeHexSpot(Vector3 currentWorldPos)
     {
-        new Vector3(1, 0, 0), new Vector3(-1, 0, 0),
-        new Vector3(0.5f, 0.866f, 0), new Vector3(-0.5f, 0.866f, 0),
-        new Vector3(0.5f, -0.866f, 0), new Vector3(-0.5f, -0.866f, 0)
-    };
-
-    float minDist = float.MaxValue;
-    Vector3 bestSpot = currentWorldPos;
-
-    // Buscar en los 6 vecinos teóricos cuál está vacío
-    foreach (Vector3 dir in directions)
-    {
-        // Posición candidata basada en el espaciado
-        Vector3 candidate = currentWorldPos + (dir * bubbleSpacing);
-        
-        // "Snap" de la candidata a la grilla para asegurar alineación perfecta
-        Vector3 local = gridRoot.InverseTransformPoint(candidate);
-        float sX = Mathf.Round(local.x / bubbleSpacing) * bubbleSpacing;
-        float sY = Mathf.Round(local.y / bubbleSpacing) * bubbleSpacing; 
-        // Nota: Si usas offset hexagonal, aplica la misma lógica de arriba aquí
-        
-        Vector3 alignedCandidate = gridRoot.TransformPoint(new Vector3(sX, sY, 0));
-
-        // Chequear si está libre
-        if (!Physics.CheckSphere(alignedCandidate, bubbleSpacing * 0.4f, bubbleLayer))
+        // Definir las 6 direcciones hexagonales (aprox)
+        // Si tu grilla es cuadrada, usa Vector3.up, down, left, right
+        Vector3[] directions = new Vector3[]
         {
-            float d = Vector3.Distance(currentWorldPos, alignedCandidate);
-            if (d < minDist)
+            new Vector3(1, 0, 0), new Vector3(-1, 0, 0),
+            new Vector3(0.5f, 0.866f, 0), new Vector3(-0.5f, 0.866f, 0),
+            new Vector3(0.5f, -0.866f, 0), new Vector3(-0.5f, -0.866f, 0)
+        };
+
+        float minDist = float.MaxValue;
+        Vector3 bestSpot = currentWorldPos;
+
+        // Buscar en los 6 vecinos teóricos cuál está vacío
+        foreach (Vector3 dir in directions)
+        {
+            // Posición candidata basada en el espaciado
+            Vector3 candidate = currentWorldPos + (dir * bubbleSpacing);
+            
+            // "Snap" de la candidata a la grilla para asegurar alineación perfecta
+            Vector3 local = gridRoot.InverseTransformPoint(candidate);
+            float sX = Mathf.Round(local.x / bubbleSpacing) * bubbleSpacing;
+            float sY = Mathf.Round(local.y / bubbleSpacing) * bubbleSpacing; 
+            // Nota: Si usas offset hexagonal, aplica la misma lógica de arriba aquí
+            
+            Vector3 alignedCandidate = gridRoot.TransformPoint(new Vector3(sX, sY, 0));
+
+            // Chequear si está libre
+            if (!Physics.CheckSphere(alignedCandidate, bubbleSpacing * 0.4f, bubbleLayer))
             {
-                minDist = d;
-                bestSpot = alignedCandidate;
+                float d = Vector3.Distance(currentWorldPos, alignedCandidate);
+                if (d < minDist)
+                {
+                    minDist = d;
+                    bestSpot = alignedCandidate;
+                }
             }
         }
+        return bestSpot;
     }
-    return bestSpot;
-}
 
     private void CheckForGroups(Bubble startBubble)
     {
+        // 1. Buscar coincidencias (Flood Fill)
         List<Bubble> group = new List<Bubble>();
         Queue<Bubble> queue = new Queue<Bubble>();
         HashSet<Bubble> visited = new HashSet<Bubble>();
 
         queue.Enqueue(startBubble);
         visited.Add(startBubble);
+        
+        // Necesitamos el ID de color para comparar
+        int targetColorId = startBubble.colorId;
 
         while (queue.Count > 0)
         {
             Bubble current = queue.Dequeue();
             group.Add(current);
 
-            Collider[] hits = Physics.OverlapSphere(
-                current.transform.position,
-                neighborRadius,
-                bubbleLayer
-            );
+            Collider[] hits = Physics.OverlapSphere(current.transform.position, neighborRadius, bubbleLayer);
 
             foreach (Collider hit in hits)
             {
                 Bubble neighbor = hit.GetComponent<Bubble>();
-                if (neighbor != null &&
-                    neighbor.colorId == startBubble.colorId &&
-                    !visited.Contains(neighbor))
+                // Verificar NULL antes de acceder
+                if (neighbor != null && neighbor.gameObject != null && !visited.Contains(neighbor))
                 {
-                    visited.Add(neighbor);
-                    queue.Enqueue(neighbor);
+                    if (neighbor.colorId == targetColorId) // Solo si es del mismo color
+                    {
+                        visited.Add(neighbor);
+                        queue.Enqueue(neighbor);
+                    }
                 }
             }
         }
 
+        // 2. Si el grupo es de 3 o más -> DESTRUIR
         if (group.Count >= minMatchSize)
         {
             foreach (Bubble b in group)
             {
-                allBubbles.Remove(b);
-                Destroy(b.gameObject);
+                if (b != null)
+                {
+                    allBubbles.Remove(b); // Sacar de la lista global
+                    Destroy(b.gameObject);
+                }
             }
 
-            if (scoreManager != null)
-                scoreManager.AddScore(group.Count * pointsPerBubble);
+            // Sistema de Puntuación (Opcional)
+            if (scoreManager != null) scoreManager.AddScore(group.Count * pointsPerBubble);
 
+            // 3. 🔥 ¡AQUÍ SE LLAMA A LA CAÍDA DE ISLAS! 🔥
+            // Esto solo se ejecuta si hubo una explosión
             DropDisconnectedBubbles();
-            if (allBubbles.Count == 0) Invoke(nameof(GenerateInitialGrid), 0.5f);
+
+            // Regenerar si se limpia todo
+            if (allBubbles.Count == 0) Invoke(nameof(GenerateInitialGrid), 1.0f);
         }
     }
 
