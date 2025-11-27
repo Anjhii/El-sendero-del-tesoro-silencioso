@@ -154,6 +154,15 @@ public partial class @PlayerControl: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Rotacion"",
+                    ""type"": ""Value"",
+                    ""id"": ""cd9943db-9162-4159-9cf5-03082cd196c2"",
+                    ""expectedControlType"": ""Vector2"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
                 }
             ],
             ""bindings"": [
@@ -233,6 +242,17 @@ public partial class @PlayerControl: IInputActionCollection2, IDisposable
                     ""action"": ""Y"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""82671c6f-9deb-4100-b487-d26863dda005"",
+                    ""path"": ""<Gamepad>/rightStick"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Rotacion"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -248,6 +268,7 @@ public partial class @PlayerControl: IInputActionCollection2, IDisposable
         m_Player_RT = m_Player.FindAction("RT", throwIfNotFound: true);
         m_Player_A = m_Player.FindAction("A", throwIfNotFound: true);
         m_Player_Y = m_Player.FindAction("Y", throwIfNotFound: true);
+        m_Player_Rotacion = m_Player.FindAction("Rotacion", throwIfNotFound: true);
     }
 
     ~@PlayerControl()
@@ -335,6 +356,7 @@ public partial class @PlayerControl: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_RT;
     private readonly InputAction m_Player_A;
     private readonly InputAction m_Player_Y;
+    private readonly InputAction m_Player_Rotacion;
     /// <summary>
     /// Provides access to input actions defined in input action map "Player".
     /// </summary>
@@ -374,6 +396,10 @@ public partial class @PlayerControl: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "Player/Y".
         /// </summary>
         public InputAction @Y => m_Wrapper.m_Player_Y;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/Rotacion".
+        /// </summary>
+        public InputAction @Rotacion => m_Wrapper.m_Player_Rotacion;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -421,6 +447,9 @@ public partial class @PlayerControl: IInputActionCollection2, IDisposable
             @Y.started += instance.OnY;
             @Y.performed += instance.OnY;
             @Y.canceled += instance.OnY;
+            @Rotacion.started += instance.OnRotacion;
+            @Rotacion.performed += instance.OnRotacion;
+            @Rotacion.canceled += instance.OnRotacion;
         }
 
         /// <summary>
@@ -453,6 +482,9 @@ public partial class @PlayerControl: IInputActionCollection2, IDisposable
             @Y.started -= instance.OnY;
             @Y.performed -= instance.OnY;
             @Y.canceled -= instance.OnY;
+            @Rotacion.started -= instance.OnRotacion;
+            @Rotacion.performed -= instance.OnRotacion;
+            @Rotacion.canceled -= instance.OnRotacion;
         }
 
         /// <summary>
@@ -542,5 +574,12 @@ public partial class @PlayerControl: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnY(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Rotacion" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnRotacion(InputAction.CallbackContext context);
     }
 }

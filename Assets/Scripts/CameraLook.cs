@@ -1,40 +1,53 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
-public class CameraOrientacionCarril : MonoBehaviour
+public class CameraRotationByJoystick : MonoBehaviour
 {
-    [Header("Ángulos de orientación por carril (Y)")]
-    public float[] angulosCarril = { 0f, 180f, 240f };
+    [Header("Input del joystick derecho")]
+    public InputActionReference accionRotacion;  // Joystick derecho
 
-    [Header("Carril activo")]
-    public int carrilActivo = 0;
+    [Header("Sensibilidad")]
+    public float sensibilidadX = 120f;   // Giro horizontal
+    public float sensibilidadY = 90f;    // Giro vertical
 
-    [Header("Suavidad de rotación")]
-    public float velocidadRotacion = 5f;
+    [Header("Límites de inclinación vertical")]
+    public float minY = -60f;
+    public float maxY = 60f;
+
+    private float rotacionY = 0f; // vertical (pitch)
+    private float rotacionX = 0f; // horizontal (yaw)
+
+    void Start()
+    {
+        if (accionRotacion != null)
+            accionRotacion.action.Enable();
+
+        // Inicializar con la rotación actual
+        Vector3 rot = transform.localEulerAngles;
+        rotacionX = rot.y;
+        rotacionY = rot.x;
+    }
 
     void Update()
     {
-        AplicarOrientacionCarril();
+        Vector2 input = accionRotacion.action.ReadValue<Vector2>();
+
+        // Joystick horizontal → girar eje Y
+        rotacionX += input.x * sensibilidadX * Time.deltaTime;
+
+        // Joystick vertical → mirar arriba/abajo
+        rotacionY -= input.y * sensibilidadY * Time.deltaTime;
+
+        // Limitar inclinación vertical
+        rotacionY = Mathf.Clamp(rotacionY, minY, maxY);
+
+        // Aplicar rotación final
+        transform.localRotation = Quaternion.Euler(rotacionY, rotacionX, 0f);
     }
 
-    void AplicarOrientacionCarril()
+    void OnDisable()
     {
-        if (carrilActivo < 0 || carrilActivo >= angulosCarril.Length)
-            return;
-
-        float anguloY = angulosCarril[carrilActivo];
-
-        Quaternion rotObjetivo = Quaternion.Euler(0f, anguloY, 0f);
-
-        transform.rotation = Quaternion.Slerp(
-            transform.rotation,
-            rotObjetivo,
-            velocidadRotacion * Time.deltaTime
-        );
-    }
-
-    // Puedes llamar a esto desde otro script si cambias de carril
-    public void CambiarCarril(int nuevoCarril)
-    {
-        carrilActivo = nuevoCarril;
+        if (accionRotacion != null)
+            accionRotacion.action.Disable();
     }
 }
