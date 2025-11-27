@@ -9,6 +9,10 @@ public class GameManager : MonoBehaviour
     [Header("Managers")]
     public FragmentManager fragmentManager;
     public UIManager uiManager;
+
+    [Header("Persistencia de Navegación")]
+    // 0 = Inicio, 1 = Carril 2, 2 = Carril 3, etc.
+    public int siguienteIndiceCarril = 0;
     
     public static GameManager Instance;
     
@@ -34,6 +38,12 @@ public class GameManager : MonoBehaviour
             uiManager.ActualizarUI();
     }
     
+    public void GuardarProgresoCarril(int indiceParaCargar)
+    {
+        siguienteIndiceCarril = indiceParaCargar;
+        Debug.Log($"Progreso guardado: El jugador aparecerá en el carril {indiceParaCargar} al volver.");
+    }
+
     /// <summary>
     /// Llamado cuando el jugador entra al templo - inicia el puzzle correspondiente
     /// </summary>
@@ -48,12 +58,12 @@ public class GameManager : MonoBehaviour
                 IniciarPuzzleMohán();
                 break;
                 
-            case "Madremonte":
+/*             case "Madremonte":
                 IniciarPuzzleMadremonte();
-                break;
+                break; */
                 
             case "Bachué":
-                IniciarPuzzleBachué();
+                IniciarPuzzleBachue();
                 break;
                 
             default:
@@ -71,13 +81,13 @@ public class GameManager : MonoBehaviour
         StartCoroutine(SimularPuzzleCompletado("Madremonte"));
     }
 
-    void IniciarPuzzleMadremonte()
+/*     void IniciarPuzzleMadremonte()
     {
         Debug.Log("Iniciando puzzle de la Madremonte");
         StartCoroutine(SimularPuzzleCompletado("Madremonte"));
-    }
+    } */
 
-    void IniciarPuzzleBachué()
+    void IniciarPuzzleBachue()
     {
         Debug.Log("Iniciando puzzle de Bachué");
         StartCoroutine(SimularPuzzleCompletado("Bachué"));

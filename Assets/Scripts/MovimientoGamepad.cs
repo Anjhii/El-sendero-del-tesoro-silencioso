@@ -9,8 +9,7 @@ public class MovimientoGamepad : MonoBehaviour
     public Transform cabezaVR;
     public float velocidadMovimiento = 2f;
     public InputActionReference accionMovimiento;
-    public InputActionReference accionInteractuar; // Tecla A
-    public InputActionReference accionSalirPuzzle; // Tecla Y
+    public InputActionReference accionInteractuar;
 
     [Header("Configuración Carriles")]
     public CarrilData[] carriles;
@@ -29,7 +28,7 @@ public class MovimientoGamepad : MonoBehaviour
     private Vector3 puntoCarrilMasCercano;
     private bool enPuntoFinal = false;
     private float velocidadActual;
-    private bool enEscenaPuzzle = false;
+    private bool inputHabilitado = true;
 
     [System.Serializable]
     public class CarrilData
@@ -38,7 +37,6 @@ public class MovimientoGamepad : MonoBehaviour
         public Transform[] puntosCarril;
         public float anchoCarril = 2f;
         public Transform puntoFinal;
-        public string nombreEscenaPuzzle;
     }
 
     void Start()
@@ -46,21 +44,41 @@ public class MovimientoGamepad : MonoBehaviour
         controller = GetComponent<CharacterController>();
         velocidadActual = velocidadMovimiento;
         
-        if (carriles != null && carriles.Length > 0)
+        if (GameManager.Instance != null)
+        {
+            int carrilAIniciar = GameManager.Instance.siguienteIndiceCarril;
+            
+            if (carrilAIniciar > 0)
+            {
+                ConfigurarPosicionInicial(carrilAIniciar);
+            }
+            else
+            {
+                ActivarCarril(0);
+            }
+        }
+        else
         {
             ActivarCarril(0);
         }
     }
 
+    void OnEnable()
+    {
+        if (accionMovimiento != null) accionMovimiento.action.Enable();
+        if (accionInteractuar != null) accionInteractuar.action.Enable();
+    }
+
+    void OnDisable()
+    {
+        if (accionMovimiento != null) accionMovimiento.action.Disable();
+        if (accionInteractuar != null) accionInteractuar.action.Disable();
+    }
+
     void Update()
     {
-        // Si está en escena de puzzle, solo procesar tecla Y para salir
-        if (enEscenaPuzzle)
-        {
-            ProcesarSalidaPuzzle();
-            return;
-        }
-
+        if (!inputHabilitado) return;
+        
         inputMovimiento = accionMovimiento.action.ReadValue<Vector2>();
         
         if (!enPuntoFinal)
@@ -72,6 +90,37 @@ public class MovimientoGamepad : MonoBehaviour
         AplicarSistemaCarril();
         VerificarPuntoFinal();
         ProcesarInputInteraccion();
+    }
+
+    void ConfigurarPosicionInicial(int indiceCarril)
+    {
+        Transform destino = null;
+
+        switch (indiceCarril)
+        {
+            case 1:
+                destino = posicionInicioCarril2;
+                break;
+            case 2:
+                destino = posicionInicioCarril3;
+                break;
+            case 3:
+                destino = posicionFinalCarril3;
+                break;
+        }
+
+        if (destino != null)
+        {
+            controller.enabled = false;
+            transform.position = destino.position;
+            transform.rotation = destino.rotation;
+            controller.enabled = true;
+            ActivarCarril(indiceCarril);
+        }
+        else
+        {
+            ActivarCarril(0);
+        }
     }
 
     void MoverJugador()
@@ -137,7 +186,7 @@ public class MovimientoGamepad : MonoBehaviour
         if (distanciaAlFinal < 1.5f && !enPuntoFinal)
         {
             enPuntoFinal = true;
-            Debug.Log($"¡Llegaste al final del {carriles[carrilActualIndex].nombre}! Presiona A para interactuar.");
+            Debug.Log($"¡Llegaste al final! Presiona A para interactuar.");
         }
         else if (distanciaAlFinal >= 1.5f && enPuntoFinal)
         {
@@ -147,118 +196,62 @@ public class MovimientoGamepad : MonoBehaviour
 
     void ProcesarInputInteraccion()
     {
-        if (accionInteractuar.action.triggered && enPuntoFinal && !enEscenaPuzzle)
+        if (accionInteractuar.action.triggered && enPuntoFinal && inputHabilitado)
         {
             ManejarInteraccionPuntoFinal();
         }
     }
 
-    void ProcesarSalidaPuzzle()
-    {
-        if (accionSalirPuzzle.action.triggered && enEscenaPuzzle)
-        {
-            SalirDelPuzzle();
-        }
-    }
-
     void ManejarInteraccionPuntoFinal()
-    {
-        switch (carrilActualIndex)
         {
-            case 0: // Carril 1 - Cargar escena Mohan_puzzle
-                CargarEscenaPuzzle("Mohan_Puzzle");
-                break;
-                
-            case 1: // Carril 2 - Cargar escena Bachue_puzzle
-                CargarEscenaPuzzle("Bachue_Puzzle");
-                break;
-                
-            case 2: // Carril 3 - Ir a posición final
-                CompletarCarril3();
-                break;
+            inputHabilitado = false; // Deshabilitar input durante la transición
+            
+            switch (carrilActualIndex)
+            {
+                case 0: // Final del Carril 1 -> Va a Mohan
+                    if (GameManager.Instance != null)
+                        GameManager.Instance.GuardarProgresoCarril(1);
+                    CargarEscenaPuzzle("Mohan_Puzzle");
+                    break;
+                    
+                case 1: // Final del Carril 2 -> Va a Bachue
+                    if (GameManager.Instance != null)
+                        GameManager.Instance.GuardarProgresoCarril(2);
+                    CargarEscenaPuzzle("Bachue_Puzzle");
+                    break;
+                    
+                case 2: // Final del Carril 3 -> Va a BarcoScene
+                    Debug.Log("Final del Carril 3 alcanzado. Cargando barco...");
+                    // Usamos el mismo método de carga para ir a la escena del barco
+                    CargarEscenaPuzzle("BarcoScene");
+                    break;
+            }
+            
+            enPuntoFinal = false;
         }
-        
-        enPuntoFinal = false;
-    }
 
     void CargarEscenaPuzzle(string nombreEscena)
     {
         if (SceneExists(nombreEscena))
         {
-            enEscenaPuzzle = true;
             Debug.Log($"Cargando puzzle: {nombreEscena}");
+            
+            // Limpiar inputs antes de cambiar escena
+            InputSystem.DisableAllEnabledActions();
+            
             SceneManager.LoadScene(nombreEscena);
         }
         else
         {
-            Debug.LogError($"Escena de puzzle '{nombreEscena}' no encontrada!");
+            Debug.LogError($"Escena '{nombreEscena}' no encontrada!");
+            inputHabilitado = true; // Rehabilitar input si falla
         }
     }
 
-    void SalirDelPuzzle()
-    {
-        // Regresar a la escena principal de carriles
-        string escenaPrincipal = SceneManager.GetActiveScene().name;
-        SceneManager.LoadScene(escenaPrincipal);
-        
-        // Programar la reaparición para el siguiente frame
-        StartCoroutine(ReaparecerDespuesDePuzzle());
-    }
-
-    System.Collections.IEnumerator ReaparecerDespuesDePuzzle()
-    {
-        // Esperar un frame para que la escena se cargue completamente
-        yield return null;
-        
-        switch (carrilActualIndex)
-        {
-            case 0: // Salir de Mohan_puzzle -> Carril 2
-                if (posicionInicioCarril2 != null)
-                {
-                    controller.enabled = false;
-                    transform.position = posicionInicioCarril2.position;
-                    transform.rotation = posicionInicioCarril2.rotation;
-                    controller.enabled = true;
-                    ActivarCarril(1);
-                    Debug.Log("Reapareciendo en Carril 2");
-                }
-                break;
-                
-            case 1: // Salir de Bachue_puzzle -> Carril 3
-                if (posicionInicioCarril3 != null)
-                {
-                    controller.enabled = false;
-                    transform.position = posicionInicioCarril3.position;
-                    transform.rotation = posicionInicioCarril3.rotation;
-                    controller.enabled = true;
-                    ActivarCarril(2);
-                    Debug.Log("Reapareciendo en Carril 3");
-                }
-                break;
-        }
-        
-        enEscenaPuzzle = false;
-    }
-
-    void CompletarCarril3()
-    {
-        Debug.Log("¡Has completado todos los carriles!");
-        
-        if (posicionFinalCarril3 != null)
-        {
-            controller.enabled = false;
-            transform.position = posicionFinalCarril3.position;
-            transform.rotation = posicionFinalCarril3.rotation;
-            controller.enabled = true;
-        }
-        
-        // Aquí puedes agregar lógica adicional para el final del juego
-        // como mostrar una pantalla de victoria, etc.
-    }
-
-    // Método para verificar si la escena existe (de tu LoginManager)
     private bool SceneExists(string sceneName)
     {
+        if (string.IsNullOrEmpty(sceneName)) return false;
+        
         for (int i = 0; i < SceneManager.sceneCountInBuildSettings; i++)
         {
             string scenePath = SceneUtility.GetScenePathByBuildIndex(i);
@@ -267,6 +260,12 @@ public class MovimientoGamepad : MonoBehaviour
             if (scene == sceneName)
                 return true;
         }
+        
+        // Verificar también si la escena está cargada actualmente
+        Scene sceneActual = SceneManager.GetActiveScene();
+        if (sceneActual.name == sceneName)
+            return true;
+            
         return false;
     }
 
@@ -331,27 +330,6 @@ public class MovimientoGamepad : MonoBehaviour
             carrilActualIndex = index;
             puntosCarrilActual = carriles[index].puntosCarril;
             enPuntoFinal = false;
-            Debug.Log($"Carril activado: {carriles[index].nombre}");
         }
-    }
-
-    // Método llamado cuando se carga una nueva escena
-    void OnSceneLoaded(Scene scene, LoadSceneMode mode)
-    {
-        // Si es una escena de puzzle, activar el flag
-        if (scene.name == "Mohan_puzzle" || scene.name == "Bachue_puzzle")
-        {
-            enEscenaPuzzle = true;
-        }
-    }
-
-    void OnEnable()
-    {
-        SceneManager.sceneLoaded += OnSceneLoaded;
-    }
-
-    void OnDisable()
-    {
-        SceneManager.sceneLoaded -= OnSceneLoaded;
     }
 }

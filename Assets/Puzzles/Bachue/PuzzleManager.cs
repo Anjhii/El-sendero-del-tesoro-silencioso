@@ -13,7 +13,7 @@ public class PuzzleManager : MonoBehaviour
     public TextMeshProUGUI bubblesRemainingText; // El texto TMP de # restantes
     
     [Header("Tiempos")]
-    public float startDelay = 2.0f;      // Esperar antes de mostrar instrucciones
+    public float startDelay = 1.0f;      // Esperar antes de mostrar instrucciones
     public float showDuration = 11.0f;   // Cuánto tiempo mostrar instrucciones
 
     private BubbleGridManager gridManager;
